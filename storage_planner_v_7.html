@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>10 ft × 15 ft Storage‑Unit Layout Planner – v7 (free‑space + fine inches)</title>
+  <style>
+    *{box-sizing:border-box}
+    body{font-family:system-ui,sans-serif;display:flex;gap:1.5rem;padding:1rem;background:#f8fafc}
+    canvas{border-radius:.5rem;box-shadow:0 2px 8px rgba(0,0,0,.1);touch-action:none;user-select:none}
+    #panel{width:260px;display:flex;flex-direction:column;gap:1rem}
+    h2{font-size:1.1rem;margin:0;font-weight:600;color:#334155}
+    ul{list-style:none;margin:0;padding:0;max-height:260px;overflow:auto;border:1px solid #e2e8f0;border-radius:.5rem}
+    li{padding:.35rem .5rem;cursor:pointer;border-bottom:1px solid #e2e8f0;display:flex;flex-direction:column;gap:.1rem}
+    li:last-child{border-bottom:none}
+    li.active{background:#e0f2fe}
+    .row{display:flex;align-items:center;gap:.5rem}
+    .swatch{width:16px;height:16px;border-radius:3px;border:1px solid #cbd5e1}
+    .dim{font-size:.7rem;color:#64748b;margin-left:1.5rem}
+    label{display:flex;flex-direction:column;font-size:.8rem;color:#475569;gap:.25rem}
+    input,button{font:inherit;padding:.25rem .5rem;border:1px solid #cbd5e1;border-radius:.35rem}
+    input[type="color"]{padding:0;border:none;width:32px;height:32px}
+    button{cursor:pointer;background:#e2e8f0;transition:.15s}
+    button:hover{background:#cbd5e1}
+    button:active{background:#94a3b8;color:#fff}
+    #edit{display:none;flex-direction:column;gap:.5rem;border:1px solid #e2e8f0;border-radius:.5rem;padding:.75rem}
+    #spaceInfo{font-size:.85rem;color:#0f172a;border:1px solid #e2e8f0;border-radius:.5rem;padding:.5rem;background:#f1f5f9}
+  </style>
+</head>
+<body>
+  <!-- Canvas -->
+  <div style="display:flex;flex-direction:column;align-items:center;gap:.75rem">
+    <h1 style="font-size:1.25rem;margin:0;font-weight:600">Storage‑Unit Layout Planner (10 ft W × 15 ft D)</h1>
+    <canvas id="stage" width="600" height="900"></canvas>
+    <div style="display:flex;gap:.75rem">
+      <button id="savePng">Save PNG</button>
+      <button id="saveLayout">Save Layout</button>
+      <button id="loadLayout">Load Layout</button>
+      <input type="file" id="fileInput" accept="application/json" style="display:none" />
+    </div>
+  </div>
+
+  <!-- Control panel -->
+  <div id="panel">
+    <h2>Objects</h2>
+    <ul id="objList"></ul>
+    <button id="addObj">➕ Add Object</button>
+
+    <!-- Free‑space read‑out -->
+    <div id="spaceInfo">Calculating…</div>
+
+    <div id="edit">
+      <h2 style="font-size:1rem">Edit Selected</h2>
+      <label>Name<input id="nameInp"></label>
+      <label>Width (in)<input type="number" step="0.25" id="wInp"></label>
+      <label>Height (in)<input type="number" step="0.25" id="hInp"></label>
+      <label>Color<input type="color" id="colInp"></label>
+      <label>Transparency (α)<input type="range" min="0" max="1" step="0.05" id="alphaInp"></label>
+      <button id="delObj" style="background:#fecaca">🗑 Delete</button>
+    </div>
+  </div>
+
+<script>
+/***** CONFIG *****/
+const SCALE=5;                    // 1 in = 5 px
+const UNIT_W=120*SCALE;           // 600 px (10 ft)
+const UNIT_H=180*SCALE;           // 900 px (15 ft)
+const PILLAR=3*SCALE;             // 3 in side pillars – immovable posts
+
+/***** Helpers *****/
+const make=(label,w,h,x,y,color)=>({id:crypto.randomUUID(),label,w:w*SCALE,h:h*SCALE,x,y,color,angle:0,alpha:1});
+const inch=(px)=>px/SCALE;
+const dimsTxt=(it)=>{
+  const w=inch(it.w).toFixed(2).replace(/\.00$/,'');
+  const h=inch(it.h).toFixed(2).replace(/\.00$/,'');
+  return `${w}×${h}\u2033`; // 36.25×24.5″
+};
+
+/***** Sample items *****/
+let items=[
+  make('Pallet 1',36,57,PILLAR,0,'#b0c4de'),
+  make('Pallet 2',39,58,PILLAR+160,0,'#b0c4de'),
+  make('Chaise',42,64,PILLAR+300,330,'#deb887')
+];
+
+/***** Canvas *****/
+const canvas=document.getElementById('stage');
+const ctx=canvas.getContext('2d');
+
+let selected=null,drag=false,offX=0,offY=0;
+function dims(it){return(it.angle%180===0)?{w:it.w,h:it.h}:{w:it.h,h:it.w};}
+
+function draw(){
+  ctx.clearRect(0,0,UNIT_W,UNIT_H);
+  /* Pillars */
+  ctx.fillStyle='#e5e7eb';
+  ctx.fillRect(0,0,PILLAR,UNIT_H);
+  ctx.fillRect(UNIT_W-PILLAR,0,PILLAR,UNIT_H);
+
+  /* Grid */
+  ctx.strokeStyle='#f3f4f6';ctx.lineWidth=1;
+  for(let x=PILLAR;x<=UNIT_W-PILLAR;x+=60){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,UNIT_H);ctx.stroke();}
+  for(let y=0;y<=UNIT_H;y+=60){ctx.beginPath();ctx.moveTo(PILLAR,y);ctx.lineTo(UNIT_W-PILLAR,y);ctx.stroke();}
+
+  /* Items */
+  for(const it of items){
+    ctx.save();
+    ctx.translate(it.x+it.w/2,it.y+it.h/2);
+    ctx.rotate(it.angle*Math.PI/180);
+    ctx.globalAlpha=it.alpha;
+    ctx.fillStyle=it.color;
+    ctx.fillRect(-it.w/2,-it.h/2,it.w,it.h);
+    ctx.strokeStyle='#475569';ctx.lineWidth=2;ctx.strokeRect(-it.w/2,-it.h/2,it.w,it.h);
+    /* label + dims */
+    ctx.fillStyle='#000';ctx.font='12px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    const lines=[it.label,dimsTxt(it)];
+    lines.forEach((ln,i)=>ctx.fillText(ln,0,(i-(lines.length-1)/2)*14));
+    ctx.restore();
+  }
+  updateSpace(); // <‑‑ refresh free‑space metric when stage is redrawn
+}
+
+/***** Free‑space calculation *****/
+const spaceInfo=document.getElementById('spaceInfo');
+function updateSpace(){
+  const usableW=(UNIT_W-2*PILLAR)/SCALE;     // inches
+  const usableD=UNIT_H/SCALE;                // inches
+  const unitAreaIn=usableW*usableD;          // in² total
+  let occupied=0;
+  for(const it of items){occupied += inch(it.w)*inch(it.h);} // in²
+  const free=unitAreaIn-occupied;
+  const freeFt=free/144; // ft²
+  spaceInfo.textContent=`Free space: ${freeFt.toFixed(1)} ft²  (${free.toFixed(0)} in²)`;
+}
+
+/***** Object list *****/
+const listEl=document.getElementById('objList');
+function refreshList(){
+  listEl.innerHTML='';
+  items.forEach(it=>{
+    const li=document.createElement('li');li.dataset.id=it.id;li.className=it===selected?'active':'';
+    const row=document.createElement('div');row.className='row';
+    const sw=document.createElement('span');sw.className='swatch';sw.style.background=it.color;row.appendChild(sw);
+    row.appendChild(document.createTextNode(it.label));
+    li.appendChild(row);
+    const d=document.createElement('span');d.className='dim';d.textContent=dimsTxt(it);li.appendChild(d);
+    li.onclick=()=>{selected=it;refreshList();updateEditor();draw();};
+    listEl.appendChild(li);
+  });
+}
+
+/***** Editor *****/
+const edit=document.getElementById('edit');
+const nameInp=document.getElementById('nameInp');
+const wInp=document.getElementById('wInp');
+const hInp=document.getElementById('hInp');
+const colInp=document.getElementById('colInp');
+const alphaInp=document.getElementById('alphaInp');
+function updateEditor(){
+  if(!selected){edit.style.display='none';return;}
+  edit.style.display='flex';
+  nameInp.value=selected.label;
+  wInp.value=inch(selected.w).toFixed(2);
+  hInp.value=inch(selected.h).toFixed(2);
+  colInp.value=selected.color;
+  alphaInp.value=selected.alpha;
+}
+[nameInp,wInp,hInp,colInp,alphaInp].forEach(inp=>inp.oninput=applyChanges);
+function applyChanges(){
+  if(!selected) return;
+  selected.label=nameInp.value.trim()||'Unnamed';
+  selected.w=parseFloat(wInp.value||0)*SCALE;
+  selected.h=parseFloat(hInp.value||0)*SCALE;
+  selected.color=colInp.value;
+  selected.alpha=parseFloat(alphaInp.value);
+  draw();refreshList();
+}
+
+/***** Delete *****/
+document.getElementById('delObj').onclick=()=>{
+  if(!selected) return; items=items.filter(it=>it!==selected); selected=null; refreshList(); updateEditor(); draw();
+};
+
+/***** Add *****/
+document.getElementById('addObj').onclick=()=>{
+  const base=make('New',12,12,UNIT_W/2,UNIT_H/2,'#a7f3d0');
+  base.alpha=0.8; items.push(base); selected=base; refreshList(); updateEditor(); draw();
+};
+
+/***** Canvas drag *****/
+function hit(it,px,py){
+  const cx=it.x+it.w/2,cy=it.y+it.h/2,dx=px-cx,dy=py-cy,rad=-it.angle*Math.PI/180;
+  const rx=dx*Math.cos(rad)-dy*Math.sin(rad),ry=dx*Math.sin(rad)+dy*Math.cos(rad);
+  return rx>-it.w/2&&rx<it.w/2&&ry>-it.h/2&&ry<it.h/2;
+}
+canvas.addEventListener('pointerdown',e=>{
+  const r=canvas.getBoundingClientRect();const px=e.clientX-r.left,py=e.clientY-r.top;
+  selected=null;for(let i=items.length-1;i>=0;i--){if(hit(items[i],px,py)){selected=items[i];offX=px-(selected.x+selected.w/2);offY=py-(selected.y+selected.h/2);drag=true;break;}}
+  refreshList();updateEditor();draw();
+});
+canvas.addEventListener('pointermove',e=>{
+  if(!drag||!selected) return;
+  const r=canvas.getBoundingClientRect();
+  let nx=e.clientX-r.left-selected.w/2-offX,ny=e.clientY-r.top-selected.h/2-offY;
+  const {w:horiz,h:vert}=dims(selected);
+  const minX=PILLAR,maxX=UNIT_W-PILLAR-horiz;
+  const minY=0,maxY=UNIT_H-vert;
+  selected.x=Math.min(Math.max(nx,minX),maxX);
+  selected.y=Math.min(Math.max(ny,minY),maxY);
+  draw();
+});
+window.addEventListener('pointerup',()=>{drag=false;});
+
+/***** Save & load *****/
+const savePng=document.getElementById('savePng');
+const saveLayout=document.getElementById('saveLayout');
+const loadLayout=document.getElementById('loadLayout');
+const fileInput=document.getElementById('fileInput');
+
+savePng.onclick=()=>{
+  const a=document.createElement('a');a.download='storage-layout.png';a.href=canvas.toDataURL('image/png');a.click();
+};
+
+saveLayout.onclick=()=>{
+  const data=JSON.stringify(items.map(it=>({
+    label:it.label,
+    width_in:inch(it.w),
+    height_in:inch(it.h),
+    x_in:inch(it.x),
+    y_in:inch(it.y),
+    color:it.color,
+    angle:it.angle,
+    alpha:it.alpha
+  })),null,2);
+  const blob=new Blob([data],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='storage-layout.json';a.click();
+  URL.revokeObjectURL(url);
+};
+
+loadLayout.onclick=()=>fileInput.click();
+fileInput.onchange=(e)=>{
+  const file=e.target.files[0];if(!file) return;
+  const reader=new FileReader();
+  reader.onload=(evt)=>{
+    try{
+      const arr=JSON.parse(evt.target.result);
+      if(!Array.isArray(arr)) throw 'Not array';
+      items=arr.map(o=>make(o.label||'Item',o.width_in||12,o.height_in||12,(o.x_in||0)*SCALE,(o.y_in||0)*SCALE,o.color||'#ddd'));
+      items.forEach((it,i)=>{it.angle=arr[i].angle||0;it.alpha=arr[i].alpha==null?1:arr[i].alpha;});
+      selected=null;refreshList();updateEditor();draw();
+    }catch(err){alert('Invalid layout file');}
+  };
+  reader.readAsText(file);
+  fileInput.value='';
+};
+
+/***** init *****/
+refreshList();draw();
+</script>
+</body>
+</html>
