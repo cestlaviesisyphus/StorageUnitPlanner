@@ -76,10 +76,25 @@ const dimsTxt=(it)=>{
 };
 
 /***** Sample items *****/
-let items=[
-  make('Pallet 1',36,57,PILLAR,0,'#b0c4de'),
-  make('Pallet 2',39,58,PILLAR+160,0,'#b0c4de'),
-  make('Chaise',42,64,PILLAR+300,330,'#deb887')
+let items = [
+  {label:"Wooden Pallet One", w:285, h:180, x:28.6, y:12, color:"#a0a17d", angle:0, alpha:1, id:crypto.randomUUID()},
+  {label:"Wooden Pallet Two", w:195, h:290, x:28, y:194.8, color:"#b2b396", angle:0, alpha:1, id:crypto.randomUUID()},
+  {label:"Wooden Pallet Three", w:255, h:157.5, x:27.2, y:488.4, color:"#c0c1aa", angle:0, alpha:1, id:crypto.randomUUID()},
+  {label:"Couch Chaise", w:320, h:210, x:23, y:6.4, color:"#ffdc2e", angle:0, alpha:0.8, id:crypto.randomUUID()},
+  {label:"Couch Middle", w:175, h:157.5, x:28.8, y:218, color:"#f0d443", angle:0, alpha:0.8, id:crypto.randomUUID()},
+  {label:"Couch End", w:175, h:190, x:28.8, y:378, color:"#f0d443", angle:0, alpha:0.8, id:crypto.randomUUID()},
+  {label:"Cooler", w:80, h:135, x:22.4, y:718, color:"#2c41dd", angle:0, alpha:0.8, id:crypto.randomUUID()},
+  {label:"JB Totes", w:97.5, h:142.5, x:382.4, y:581.2, color:"#555857", angle:0, alpha:0.8, id:crypto.randomUUID()},
+  {label:"Mattress", w:50, h:190, x:531.2, y:580.4, color:"#a7f3d0", angle:0, alpha:0.8, id:crypto.randomUUID()},
+  {label:"Box Spring", w:45, h:190, x:484, y:581.2, color:"#a7f3d0", angle:0, alpha:0.8, id:crypto.randomUUID()},
+  {label:"Shawn Tote", w:87.5, h:112.5, x:493.6, y:5.2, color:"#d8a5f3", angle:0, alpha:0.8, id:crypto.randomUUID()},
+  {label:"Shawn Tote", w:87.5, h:112.5, x:494.4, y:121.2, color:"#dfb6f4", angle:0, alpha:0.8, id:crypto.randomUUID()},
+  {label:"SHELF", w:90, h:240, x:492, y:237.2, color:"#e2f3a5", angle:0, alpha:0.8, id:crypto.randomUUID()},
+  {label:"Shawn Tote", w:90, h:115, x:398.4, y:274.8, color:"#e4c4f5", angle:0, alpha:0.8, id:crypto.randomUUID()},
+  {label:"TV Box", w:40, h:265, x:448.8, y:3.6, color:"#c7a975", angle:0, alpha:0.8, id:crypto.randomUUID()},
+  {label:"LONG TOTE", w:157.5, h:97.5, x:423.2, y:480.4, color:"#a7f3d0", angle:0, alpha:0.8, id:crypto.randomUUID()},
+  {label:"Tire 2", w:125, h:50, x:460, y:773.2, color:"#bababa", angle:0, alpha:0.8, id:crypto.randomUUID()},
+  {label:"Tire 1", w:50, h:125, x:430.4, y:727.6, color:"#c7c7c7", angle:0, alpha:0.8, id:crypto.randomUUID()}
 ];
 
 /***** Canvas *****/
